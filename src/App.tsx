@@ -18,7 +18,7 @@ import { PJOK_MERGE_SETTING_KEY, isEkskulSlot, isPjokMergeEnabled } from './lib/
 import { DATASET } from './lib/dataset';
 import { generateSchedule, WEEKLY_CAPACITY } from './lib/scheduler';
 import { exportCsv, exportExcel } from './lib/exporters';
-import { loadLocal, loadManualLoadIds, saveLocal, saveManualLoadIds } from './lib/storage';
+import { loadLocal, loadManualLoadIds, saveLocal, saveManualLoadIds, saveRemote, loadRemote } from './lib/storage';
 import type { DayId, ScheduleEntry } from './lib/types';
 
 export default function App() {
@@ -66,6 +66,14 @@ export default function App() {
   useEffect(() => {
     saveManualLoadIds([...manualLoadIds]);
   }, [manualLoadIds]);
+  
+  useEffect(() => {
+  loadRemote()
+    .then((remoteEntries) => setEntries(remoteEntries))
+    .catch(() => {
+      // Kalau fetch ke Neon gagal, tetap pakai data localStorage yang sudah dimuat
+    });
+}, []);
 
   const animateGrid = useCallback(() => {
     if (!gridWrapRef.current) return;
@@ -195,9 +203,21 @@ export default function App() {
                 Hapus Total
               </Button>
             </Popconfirm>
-            <Tooltip title="Jadwal otomatis tersimpan di browser">
-              <Button icon={<SaveOutlined />} onClick={() => { saveLocal(entries); message.success('Tersimpan.'); }}>
-                Simpan
+            <Tooltip title="Jadwal tersimpan ke server (Neon), bisa diakses dari device lain">
+              <Button
+                icon={<SaveOutlined />}
+                onClick={async () => {
+                  try {
+                    await saveRemote(entries);
+                      saveLocal(entries);
+                      message.success('Tersimpan ke server.');
+                      } catch {
+                      saveLocal(entries);
+                      message.error('Gagal simpan ke server — hanya tersimpan di browser ini.');
+                    }
+              }}
+              >
+              Simpan
               </Button>
             </Tooltip>
             <Tooltip title="Gabungkan PJOK: X AK + X RPL dan XI DKV 1 + XI DKV 2 (2 JP menjadi 3 JP, slot sejajar). Aplikasi akan direstart.">
