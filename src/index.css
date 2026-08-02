@@ -1,0 +1,19 @@
+@import 'tailwindcss';
+
+@media print {
+  body {
+    background: white;
+  }
+  .print\:hidden {
+    display: none !important;
+  }
+  .print-grid {
+    border: none;
+    box-shadow: none;
+    overflow: visible;
+  }
+  @page {
+    size: A4 landscape;
+    margin: 8mm;
+  }
+}
