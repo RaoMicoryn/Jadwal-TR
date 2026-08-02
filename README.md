@@ -35,13 +35,6 @@ npm run lint     # oxlint
 
 Jadwal tersimpan otomatis di `localStorage`.
 
-## Database Neon PostgreSQL (opsional, deploy 24 jam)
-
-1. Buat project gratis di [neon.tech](https://neon.tech), salin connection string (`postgresql://user:pass@host/db`).
-2. Di Neon SQL Editor, jalankan `db/schema.sql` lalu `db/seed.sql` (regenerasi seed: `npx tsx scripts/generateSeed.ts`).
-3. Deploy ke Vercel; fungsi `api/schedules.ts` otomatis menjadi endpoint `GET/PUT /api/schedules`.
-4. Set env `DATABASE_URL` (Vercel) dan `VITE_API_BASE_URL` (kosongkan jika satu domain).
-
 ## Struktur data
 
 - `src/data/pembagianTugas.ts` — data guru/mapel/JP hasil ekstraksi sheet **'Pembagian Tugas'**.
