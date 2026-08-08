@@ -406,7 +406,10 @@ export default function App() {
                       .then(() => message.success('Excel berhasil diexport'))
                       .catch(() => message.error('Gagal export Excel, coba lagi.'))
                       .finally(hide);
-                  } else if (key === 'cetak') window.print();
+                  } else if (key === 'cetak') {
+                    setExportOpen(false);
+                    requestAnimationFrame(() => window.print());
+                  }
                 },
               }}
               open={exportOpen}

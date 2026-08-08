@@ -12,6 +12,12 @@
   .print\:hidden {
     display: none !important;
   }
+  .ant-dropdown,
+  .ant-popover,
+  .ant-tooltip,
+  .ant-select-dropdown {
+    display: none !important;
+  }
   .print-grid {
     border: none;
     box-shadow: none;
@@ -19,9 +25,32 @@
   }
   .print-grid table {
     width: 100%;
+    font-size: 6.5px;
+    line-height: 1.15;
+    table-layout: fixed;
+  }
+  .print-grid th,
+  .print-grid td {
+    padding: 1px 2px !important;
+    min-width: 0 !important;
+    width: auto !important;
+  }
+  .print-grid td {
+    height: auto !important;
+  }
+  .print-grid tr {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  .print-grid .schedule-cell {
+    padding: 1px 2px !important;
+    border-radius: 2px !important;
+  }
+  .print-grid .sticky {
+    position: static !important;
   }
   @page {
     size: A4 landscape;
-    margin: 8mm;
+    margin: 6mm;
   }
 }
