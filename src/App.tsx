@@ -400,8 +400,13 @@ export default function App() {
                 ] as MenuProps['items'],
                 onClick: ({ key }) => {
                   if (key === 'csv') exportCsv(entries);
-                  else if (key === 'excel') exportExcel(entries);
-                  else if (key === 'cetak') window.print();
+                  else if (key === 'excel') {
+                    const hide = message.loading('Menyiapkan file Excel...', 0);
+                    exportExcel(entries)
+                      .then(() => message.success('Excel berhasil diexport'))
+                      .catch(() => message.error('Gagal export Excel, coba lagi.'))
+                      .finally(hide);
+                  } else if (key === 'cetak') window.print();
                 },
               }}
               open={exportOpen}
@@ -443,6 +448,17 @@ export default function App() {
               {focusLabel}
             </Tag>
           )}
+        </div>
+
+        <div className="hidden print:block">
+          <div className="bg-blue-900 px-3 py-2 text-center text-base font-bold text-white">
+            JADWAL PELAJARAN
+          </div>
+          <div className="bg-slate-100 px-3 py-1 text-center text-[10px] italic text-slate-600">
+            Digenerate{' '}
+            {new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' })} ·{' '}
+            {DATASET.classes.length} kelas
+          </div>
         </div>
 
         <div ref={gridWrapRef}>
