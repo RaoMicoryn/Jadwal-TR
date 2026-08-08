@@ -2,7 +2,7 @@ import { Empty, List, Tag } from 'antd';
 import { CheckCircleFilled, WarningFilled } from '@ant-design/icons';
 import type { Violation } from '../lib/types';
 
-const CODE_LABELS: Record<Violation['code'], string> = {
+export const CODE_LABELS: Record<Violation['code'], string> = {
   TEACHER_CLASH: 'Bentrok Guru',
   CLASS_DOUBLE_BOOKED: 'Kelas Dobel',
   PJOK_DAY: 'Hari PJOK',

@@ -1,17 +1,22 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { App as AntApp, Badge, Button, Popconfirm, Space, Switch, Tooltip } from 'antd';
+import { App as AntApp, Button, Dropdown, Empty, Popconfirm, Popover, Select, Space, Switch, Tag, Tooltip } from 'antd';
+import type { MenuProps } from 'antd';
 import {
+  CheckCircleFilled,
   ClearOutlined,
+  CloseCircleFilled,
   DownloadOutlined,
+  DownOutlined,
   FileExcelOutlined,
+  FilterOutlined,
   PrinterOutlined,
   SaveOutlined,
   ThunderboltOutlined,
+  WarningFilled,
 } from '@ant-design/icons';
 import gsap from 'gsap';
 import ScheduleGrid from './components/ScheduleGrid';
-import ConflictLog from './components/ConflictLog';
-import ManualForm, { type ManualValue } from './components/ManualForm';
+import ConflictLog, { CODE_LABELS } from './components/ConflictLog';
 import MasterData from './components/MasterData';
 import { defaultManualLoadIds, validate } from './lib/constraints';
 import { PJOK_MERGE_SETTING_KEY, isEkskulSlot, isPjokMergeEnabled } from './lib/constants';
@@ -19,7 +24,7 @@ import { DATASET } from './lib/dataset';
 import { generateSchedule, WEEKLY_CAPACITY } from './lib/scheduler';
 import { exportCsv, exportExcel } from './lib/exporters';
 import { loadLocal, loadManualLoadIds, saveLocal, saveManualLoadIds, saveRemote, loadRemote } from './lib/storage';
-import type { DayId, ScheduleEntry } from './lib/types';
+import type { DayId, FocusFilter, Load, ScheduleEntry } from './lib/types';
 
 export default function App() {
   const { message } = AntApp.useApp();
@@ -28,6 +33,9 @@ export default function App() {
   const [manualLoadIds, setManualLoadIds] = useState<Set<string>>(
     () => new Set(loadManualLoadIds() ?? defaultManualLoadIds()),
   );
+  const [lockPin, setLockPin] = useState(true);
+  const [exportOpen, setExportOpen] = useState(false);
+  const [focusFilter, setFocusFilter] = useState<FocusFilter>(null);
 
   // Kunci kelas|mapel|guru dari beban yang di-set Manual — untuk mengenali entrinya.
   const manualKeys = useMemo(
@@ -45,6 +53,63 @@ export default function App() {
   );
   const headerRef = useRef<HTMLDivElement>(null);
   const gridWrapRef = useRef<HTMLDivElement>(null);
+  const conflictLogRef = useRef<HTMLDivElement>(null);
+
+  const scrollToConflictLog = useCallback(() => {
+    conflictLogRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, []);
+
+  // Filter View (Focus Mode): dropdown gabungan Kelas / Guru / Ruangan.
+  const focusOptions = useMemo(() => {
+    const rooms = [...new Set(DATASET.classes.map((c) => c.room))];
+    return [
+      {
+        label: 'Kelas',
+        title: 'Kelas',
+        options: DATASET.classes.map((c) => ({
+          value: `kelas:${c.id}`,
+          label: `${c.className} (${c.room})`,
+        })),
+      },
+      {
+        label: 'Guru',
+        title: 'Guru',
+        options: DATASET.teachers.map((t) => ({ value: `guru:${t.id}`, label: t.name })),
+      },
+      {
+        label: 'Ruangan',
+        title: 'Ruangan',
+        options: rooms.map((r) => ({ value: `ruangan:${r}`, label: r })),
+      },
+    ];
+  }, []);
+
+  const focusSelectValue = useMemo(() => {
+    if (!focusFilter) return undefined;
+    if (focusFilter.type === 'kelas') return `kelas:${focusFilter.classId}`;
+    if (focusFilter.type === 'guru') return `guru:${focusFilter.teacherId}`;
+    return `ruangan:${focusFilter.room}`;
+  }, [focusFilter]);
+
+  const focusLabel = useMemo(() => {
+    if (!focusFilter) return null;
+    if (focusFilter.type === 'kelas')
+      return `Kelas: ${DATASET.classes.find((c) => c.id === focusFilter.classId)?.className ?? '?'}`;
+    if (focusFilter.type === 'guru')
+      return `Guru: ${DATASET.teachers.find((t) => t.id === focusFilter.teacherId)?.name ?? '?'}`;
+    return `Ruangan: ${focusFilter.room}`;
+  }, [focusFilter]);
+
+  const handleFocusChange = useCallback((value: string | undefined) => {
+    if (!value) {
+      setFocusFilter(null);
+      return;
+    }
+    const [type, raw] = value.split(':');
+    if (type === 'kelas') setFocusFilter({ type: 'kelas', classId: Number(raw) });
+    else if (type === 'guru') setFocusFilter({ type: 'guru', teacherId: Number(raw) });
+    else if (type === 'ruangan') setFocusFilter({ type: 'ruangan', room: raw });
+  }, []);
 
   const violations = useMemo(() => validate(entries, manualLoadIds), [entries, manualLoadIds]);
   const hardCount = violations.filter((v) => v.severity === 'hard').length;
@@ -148,24 +213,35 @@ export default function App() {
     setEntries((prev) => prev.filter((e) => e.id !== entryId));
   }, []);
 
-  const handleManualAdd = useCallback(
-    (v: ManualValue) => {
-      if (isEkskulSlot(v.day, v.period)) {
+  const handleQuickAdd = useCallback(
+    (load: Load, target: { classId: number; day: DayId; period: number }) => {
+      if (isEkskulSlot(target.day, target.period)) {
         message.warning('Kamis jam 9 (14.20-15.00) reserved untuk Kegiatan Ekskul Wajib.');
         return;
       }
       setEntries((prev) => {
-        if (prev.some((e) => e.classId === v.classId && e.day === v.day && e.period === v.period)) {
+        if (
+          prev.some((e) => e.classId === target.classId && e.day === target.day && e.period === target.period)
+        ) {
           message.warning('Slot tersebut sudah terisi. Hapus/geser dulu isinya.');
           return prev;
         }
         return [
           ...prev,
-          { ...v, id: `M${Date.now()}-${v.classId}-${v.day}-${v.period}`, mergeGroupId: undefined },
+          {
+            id: `M${Date.now()}-${target.classId}-${target.day}-${target.period}`,
+            classId: target.classId,
+            subjectId: load.subjectId,
+            teacherId: load.teacherId,
+            day: target.day,
+            period: target.period,
+            pinned: lockPin,
+            mergeGroupId: undefined,
+          },
         ];
       });
     },
-    [message],
+    [message, lockPin],
   );
 
   return (
@@ -220,6 +296,12 @@ export default function App() {
               Simpan
               </Button>
             </Tooltip>
+            <Tooltip title="Saat menambah mapel lewat tombol + di jadwal, slot langsung dikunci (pin) supaya tidak ikut diacak ulang oleh Randomizer.">
+              <span className="flex items-center gap-1 text-sm text-slate-600">
+                Lock pin
+                <Switch size="small" checked={lockPin} onChange={setLockPin} />
+              </span>
+            </Tooltip>
             <Tooltip title="Gabungkan PJOK: X AK + X RPL dan XI DKV 1 + XI DKV 2 (2 JP menjadi 3 JP, slot sejajar). Aplikasi akan direstart.">
               <span className="flex items-center gap-1 text-sm text-slate-600">
                 Gabungan PJOK
@@ -235,26 +317,132 @@ export default function App() {
             </Tooltip>
           </Space>
           <Space wrap>
-            <Badge count={hardCount} color="red" offset={[-4, 0]}>
-              <Badge count={softCount} color="orange" offset={[-4, 30]}>
-                <span className="pr-3 text-sm text-slate-600">{entries.length} JP terjadwal</span>
-              </Badge>
-            </Badge>
-            <Button icon={<DownloadOutlined />} onClick={() => exportCsv(entries)}>
-              CSV
-            </Button>
-            <Button icon={<FileExcelOutlined />} onClick={() => exportExcel(entries)}>
-              Excel
-            </Button>
-            <Button icon={<PrinterOutlined />} onClick={() => window.print()}>
-              Cetak
-            </Button>
+            <Popover
+              trigger={['hover', 'click']}
+              placement="bottomRight"
+              title={
+                <span className="text-xs font-semibold text-slate-600">
+                  {entries.length} JP terjadwal
+                </span>
+              }
+              content={
+                <div className="w-72">
+                  {violations.length === 0 ? (
+                    <div className="flex items-center gap-2 py-1 text-xs text-green-700">
+                      <CheckCircleFilled /> Zero Conflict — tidak ada bentrok.
+                    </div>
+                  ) : (
+                    <>
+                      <div className="mb-1.5 flex gap-1.5">
+                        <Tag color="red">{hardCount} keras</Tag>
+                        <Tag color="orange">{softCount} lunak</Tag>
+                      </div>
+                      <div className="max-h-56 space-y-1 overflow-y-auto pr-0.5">
+                        {violations.slice(0, 6).map((v) => (
+                          <div key={v.id} className="flex items-start gap-1.5 text-[11px] leading-tight">
+                            <WarningFilled
+                              className={v.severity === 'hard' ? 'mt-0.5 text-red-500' : 'mt-0.5 text-amber-500'}
+                            />
+                            <div>
+                              <Tag color={v.severity === 'hard' ? 'red' : 'orange'}>{CODE_LABELS[v.code]}</Tag>
+                              {v.message}
+                            </div>
+                          </div>
+                        ))}
+                        {violations.length === 0 && <Empty />}
+                      </div>
+                      {violations.length > 6 && (
+                        <div className="mt-1 text-[11px] text-slate-400">
+                          +{violations.length - 6} lainnya
+                        </div>
+                      )}
+                      <button
+                        className="mt-2 cursor-pointer text-xs text-blue-600 hover:underline"
+                        onClick={scrollToConflictLog}
+                      >
+                        Lihat semua di Conflict Log →
+                      </button>
+                    </>
+                  )}
+                </div>
+              }
+            >
+              <button
+                type="button"
+                onClick={scrollToConflictLog}
+                className="mr-2 flex cursor-pointer items-center gap-2 border-none bg-transparent p-0"
+              >
+                <span className="text-sm text-slate-600 hover:text-slate-800">
+                  {entries.length} JP terjadwal
+                </span>
+                {(hardCount > 0 || softCount > 0) && (
+                  <span className="flex items-center gap-1">
+                    {hardCount > 0 && (
+                      <span className="inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-semibold leading-none text-white">
+                        {hardCount > 99 ? '99+' : hardCount}
+                      </span>
+                    )}
+                    {softCount > 0 && (
+                      <span className="inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] font-semibold leading-none text-white">
+                        {softCount > 99 ? '99+' : softCount}
+                      </span>
+                    )}
+                  </span>
+                )}
+              </button>
+            </Popover>
+            <Dropdown
+              menu={{
+                items: [
+                  { key: 'csv', label: 'Export CSV', icon: <DownloadOutlined /> },
+                  { key: 'excel', label: 'Export Excel', icon: <FileExcelOutlined /> },
+                  { key: 'cetak', label: 'Cetak', icon: <PrinterOutlined /> },
+                ] as MenuProps['items'],
+                onClick: ({ key }) => {
+                  if (key === 'csv') exportCsv(entries);
+                  else if (key === 'excel') exportExcel(entries);
+                  else if (key === 'cetak') window.print();
+                },
+              }}
+              open={exportOpen}
+              onOpenChange={setExportOpen}
+            >
+              <Button icon={<DownloadOutlined />}>
+                Export <DownOutlined className={`transition-transform duration-200 ${exportOpen ? 'rotate-180' : ''}`} />
+              </Button>
+            </Dropdown>
           </Space>
         </div>
 
-        <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm print:hidden">
-          <h2 className="mb-2 text-sm font-semibold text-slate-700">Mode Manual tambah / kunci mapel</h2>
-          <ManualForm onAdd={handleManualAdd} />
+        <div className="flex flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-white p-2.5 shadow-sm print:hidden">
+          <span className="flex items-center gap-1.5 text-sm font-medium text-slate-600">
+            <FilterOutlined /> Fokus Tampilan
+          </span>
+          <Select
+            allowClear
+            showSearch
+            placeholder="Tampilkan semua kelas — pilih Kelas / Guru / Ruangan untuk fokus"
+            className="min-w-72 flex-1"
+            value={focusSelectValue}
+            onChange={handleFocusChange}
+            onClear={() => setFocusFilter(null)}
+            options={focusOptions}
+            optionFilterProp="label"
+            filterOption={(input, option) =>
+              (option?.label ?? '').toString().toLowerCase().includes(input.toLowerCase())
+            }
+          />
+          {focusFilter && (
+            <Tag
+              closable
+              closeIcon={<CloseCircleFilled />}
+              onClose={() => setFocusFilter(null)}
+              color="blue"
+              className="m-0"
+            >
+              {focusLabel}
+            </Tag>
+          )}
         </div>
 
         <div ref={gridWrapRef}>
@@ -264,11 +452,13 @@ export default function App() {
             onMove={handleMove}
             onTogglePin={handleTogglePin}
             onRemove={handleRemove}
+            onQuickAdd={handleQuickAdd}
+            focusFilter={focusFilter}
           />
         </div>
 
         <div className="grid gap-4 lg:grid-cols-2 print:hidden">
-          <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+          <div ref={conflictLogRef} className="scroll-mt-4 rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
             <h2 className="mb-2 text-sm font-semibold text-slate-700">Error / Conflict Log (tidak begitu berpengaruh kepada system)</h2>
             <ConflictLog violations={violations} />
           </div>

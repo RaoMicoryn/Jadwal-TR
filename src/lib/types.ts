@@ -1,5 +1,12 @@
 export type DayId = 1 | 2 | 3 | 4 | 5;
 
+/** Filter View (Focus Mode): fokus tampilan grid ke satu kelas / guru / ruangan tertentu. */
+export type FocusFilter =
+  | { type: 'kelas'; classId: number }
+  | { type: 'guru'; teacherId: number }
+  | { type: 'ruangan'; room: string }
+  | null;
+
 export interface RawAssignment {
   subject: string;
   className: string;
