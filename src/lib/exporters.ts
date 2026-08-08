@@ -44,6 +44,7 @@ export function exportCsv(entries: ScheduleEntry[]) {
 }
 
 /** Baris untuk sheet "Jadwal" — mengikuti struktur grid tampilan (termasuk band istirahat). */
+type CellInfo = { text: string; subjectId?: number; isEkskul?: boolean };
 type ExcelRow =
   | { kind: 'break'; label: string; time: string }
   | {
@@ -52,7 +53,7 @@ type ExcelRow =
       period: number;
       waktu: string;
       isFirstOfDay: boolean;
-      cells: (string | null)[];
+      cells: (CellInfo | null)[];
     };
 
 function buildScheduleRows(entries: ScheduleEntry[]): ExcelRow[] {
@@ -66,10 +67,12 @@ function buildScheduleRows(entries: ScheduleEntry[]): ExcelRow[] {
       bands.forEach((b) => rows.push({ kind: 'break', label: b.label, time: b.time }));
 
       const isEkskul = d.id === EKSKUL_DAY && EKSKUL_PERIODS.includes(p.period);
-      const cells = DATASET.classes.map((c) => {
-        if (isEkskul) return EKSKUL_LABEL;
+      const cells: (CellInfo | null)[] = DATASET.classes.map((c) => {
+        if (isEkskul) return { text: EKSKUL_LABEL, isEkskul: true };
         const e = entries.find((x) => x.classId === c.id && x.day === d.id && x.period === p.period);
-        return e ? `${subjectName(e.subjectId)}\n${shortTeacherName(e.teacherId)}` : null;
+        return e
+          ? { text: `${subjectName(e.subjectId)}\n${shortTeacherName(e.teacherId)}`, subjectId: e.subjectId }
+          : null;
       });
       rows.push({
         kind: 'data',
@@ -90,6 +93,25 @@ const THIN_BORDER = {
   bottom: { style: 'thin' as const, color: { argb: 'FFCBD5E1' } },
   right: { style: 'thin' as const, color: { argb: 'FFCBD5E1' } },
 };
+
+// Palet warna per mapel — mengikuti SUBJECT_COLORS di ScheduleGrid.tsx (sky, emerald,
+// amber, violet, rose, teal, orange, indigo, lime, fuchsia) supaya warna di Excel
+// SAMA dan sevariatif tampilan grid di aplikasi, bukan cuma putih polos.
+const SUBJECT_FILLS = [
+  'FFE0F2FE', // sky-100
+  'FFD1FAE5', // emerald-100
+  'FFFEF3C7', // amber-100
+  'FFEDE9FE', // violet-100
+  'FFFFE4E6', // rose-100
+  'FFCCFBF1', // teal-100
+  'FFFFEDD5', // orange-100
+  'FFE0E7FF', // indigo-100
+  'FFECFCCB', // lime-100
+  'FFFAE8FF', // fuchsia-100
+];
+const EKSKUL_FILL = 'FFFFFBEB'; // yellow-50, senada dengan sel Ekskul Wajib di grid
+
+const subjectFill = (subjectId: number) => SUBJECT_FILLS[subjectId % SUBJECT_FILLS.length];
 
 // Rata-rata jumlah karakter yang muat dalam satu baris untuk lebar kolom kelas (26 wch).
 // Dipakai untuk MENGHITUNG tinggi baris secara eksplisit — wrapText tanpa row height
@@ -216,22 +238,19 @@ export async function exportExcel(entries: ScheduleEntry[]) {
     row.getCell(3).border = THIN_BORDER;
 
     let maxLines = 1;
-    r.cells.forEach((text, i) => {
+    r.cells.forEach((info, i) => {
       const cell = row.getCell(4 + i);
       cell.border = THIN_BORDER;
-      if (text) {
-        cell.value = text;
+      if (info) {
+        cell.value = info.text;
         cell.alignment = { wrapText: true, vertical: 'middle', horizontal: 'center' };
-        maxLines = Math.max(maxLines, estimateWrappedLines(text));
-        const isPjok = text.startsWith('PJOK');
-        const isMandarin = text.includes('Mandarin');
-        if (isPjok || isMandarin) {
-          cell.fill = {
-            type: 'pattern',
-            pattern: 'solid',
-            fgColor: { argb: isPjok ? 'FFFEF9C3' : 'FFFCE7F3' },
-          };
-        }
+        maxLines = Math.max(maxLines, estimateWrappedLines(info.text));
+        cell.fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: info.isEkskul ? EKSKUL_FILL : subjectFill(info.subjectId ?? 0) },
+        };
+        if (info.isEkskul) cell.font = { bold: true, size: 8.5, color: { argb: 'FFA16207' } };
       } else {
         cell.alignment = { vertical: 'middle', horizontal: 'center' };
       }
