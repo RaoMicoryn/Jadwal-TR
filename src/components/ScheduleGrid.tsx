@@ -1,10 +1,11 @@
 import { Fragment, useMemo, useRef, useState } from 'react';
-import { Popover, Tag } from 'antd';
+import { Empty, Input, Popover, Tag } from 'antd';
 import {
   CodeOutlined,
   PlusOutlined,
   PushpinFilled,
   ReadOutlined,
+  SearchOutlined,
   TranslationOutlined,
   TrophyOutlined,
   WarningFilled,
@@ -46,15 +47,6 @@ const SUBJECT_COLORS = [
 
 const subjectColor = (subjectId: number) => SUBJECT_COLORS[subjectId % SUBJECT_COLORS.length];
 
-/** Aksen warna per hari untuk hasil cetak (Ctrl+P) — mengikuti palet yang sama dengan Export Excel. */
-const DAY_PRINT_ACCENTS: Record<DayId, string> = {
-  1: 'print:bg-blue-100 print:text-blue-800', // Senin
-  2: 'print:bg-emerald-100 print:text-emerald-800', // Selasa
-  3: 'print:bg-amber-100 print:text-amber-800', // Rabu
-  4: 'print:bg-violet-100 print:text-violet-800', // Kamis
-  5: 'print:bg-rose-100 print:text-rose-800', // Jumat
-};
-
 /** Tema kartu untuk popup "Pilih Mapel" — ikon + warna khas per mapel. */
 function subjectTheme(name: string, subjectId: number) {
   const n = name.toLowerCase();
@@ -95,15 +87,45 @@ function SubjectPicker({
   classId: number;
   onPick: (load: Load) => void;
 }) {
+  const [query, setQuery] = useState('');
   const loads = useMemo(() => DATASET.loads.filter((l) => l.classId === classId), [classId]);
+  const filteredLoads = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return loads;
+    return loads.filter(
+      (l) =>
+        subjectName(l.subjectId).toLowerCase().includes(q) ||
+        shortTeacherName(l.teacherId).toLowerCase().includes(q),
+    );
+  }, [loads, query]);
+
   return (
     <div className="w-64">
       <div className="mb-2 text-sm font-semibold text-slate-700">Pilih Mapel</div>
       {loads.length === 0 && (
         <div className="text-xs text-slate-400">Belum ada beban mapel untuk kelas ini.</div>
       )}
-      <div className="max-h-72 space-y-1.5 overflow-y-auto pr-0.5">
-        {loads.map((l) => {
+      {loads.length > 0 && (
+        <Input
+          size="small"
+          allowClear
+          autoFocus
+          prefix={<SearchOutlined className="text-slate-300" />}
+          placeholder="Cari mapel atau guru..."
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          className="mb-2"
+        />
+      )}
+      <div className="max-h-[350px] space-y-1.5 overflow-y-auto pr-0.5">
+        {loads.length > 0 && filteredLoads.length === 0 && (
+          <Empty
+            image={Empty.PRESENTED_IMAGE_SIMPLE}
+            description={<span className="text-xs text-slate-400">Tidak ditemukan</span>}
+            className="py-2"
+          />
+        )}
+        {filteredLoads.map((l) => {
           const theme = subjectTheme(subjectName(l.subjectId), l.subjectId);
           return (
             <button
@@ -221,7 +243,7 @@ export default function ScheduleGrid({
                     {idx === 0 && (
                       <td
                         rowSpan={dayPeriods.length + dayPeriods.slice(1).reduce((n, pp) => n + BREAKS.filter((b) => b.afterPeriod === pp.period - 1).length, 0)}
-                        className={`sticky left-0 z-10 w-14 border-r border-slate-200 bg-slate-700 px-2 text-center font-bold text-white print:border-white ${DAY_PRINT_ACCENTS[d.id]}`}
+                        className="sticky left-0 z-10 w-14 border-r border-slate-200 bg-slate-700 px-2 text-center font-bold text-white"
                       >
                         <div className="[writing-mode:vertical-rl] rotate-180 mx-auto">{d.name}</div>
                       </td>
@@ -234,7 +256,7 @@ export default function ScheduleGrid({
                         return (
                           <td
                             key={c.id}
-                            className="border-l border-slate-100 bg-yellow-50 px-1 py-1 text-center text-[10px] font-semibold text-yellow-700 print:bg-red-600 print:text-white"
+                            className="border-l border-slate-100 bg-yellow-50 px-1 py-1 text-center text-[10px] font-semibold text-yellow-700"
                           >
                             {EKSKUL_LABEL}
                           </td>
@@ -299,7 +321,7 @@ export default function ScheduleGrid({
                                     : soft
                                       ? 'border-amber-400 bg-amber-50'
                                       : subjectColor(e.subjectId)
-                                } ${e.pinned ? 'cursor-default opacity-95 print:bg-yellow-100' : ''} ${
+                                } ${e.pinned ? 'cursor-default opacity-95' : ''} ${
                                   dimmed ? 'opacity-25 saturate-0' : ''
                                 } ${focused ? 'ring-2 ring-blue-500' : ''}`}
                               >

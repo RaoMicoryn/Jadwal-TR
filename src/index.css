@@ -4,18 +4,7 @@
   body {
     background: white;
   }
-  * {
-    -webkit-print-color-adjust: exact !important;
-    print-color-adjust: exact !important;
-    color-adjust: exact !important;
-  }
   .print\:hidden {
-    display: none !important;
-  }
-  .ant-dropdown,
-  .ant-popover,
-  .ant-tooltip,
-  .ant-select-dropdown {
     display: none !important;
   }
   .print-grid {
@@ -23,31 +12,44 @@
     box-shadow: none;
     overflow: visible;
   }
+  /* Perkecil font & padding khusus saat cetak supaya grid muat 1-2 halaman A4 landscape,
+     bukan tumpah ke 3 halaman seperti sebelumnya. */
   .print-grid table {
-    width: 100%;
     font-size: 6.5px;
     line-height: 1.15;
+    width: 100%;
     table-layout: fixed;
   }
   .print-grid th,
   .print-grid td {
     padding: 1px 2px !important;
-    min-width: 0 !important;
-    width: auto !important;
-  }
-  .print-grid td {
     height: auto !important;
   }
+  .print-grid th {
+    font-size: 6.5px;
+  }
+  /* Jangan biarkan baris terpotong di tengah saat pindah halaman. */
   .print-grid tr {
-    break-inside: avoid;
     page-break-inside: avoid;
+    break-inside: avoid;
   }
+  .print-grid thead {
+    display: table-header-group;
+  }
+  /* Isi kartu jadwal: biarkan teks wrap penuh (bukan truncate/ellipsis) supaya nama
+     mapel panjang seperti "Pengembangan Perangkat Lunak dan Gim" tidak ke-cut. */
   .print-grid .schedule-cell {
-    padding: 1px 2px !important;
-    border-radius: 2px !important;
+    height: auto !important;
+    min-height: 0;
   }
-  .print-grid .sticky {
-    position: static !important;
+  .print-grid .schedule-cell .truncate {
+    overflow: visible !important;
+    white-space: normal !important;
+    text-overflow: clip !important;
+    word-break: break-word;
+  }
+  .print-grid .schedule-cell .absolute {
+    display: none;
   }
   @page {
     size: A4 landscape;

@@ -378,14 +378,18 @@ export default function App() {
                 {(hardCount > 0 || softCount > 0) && (
                   <span className="flex items-center gap-1">
                     {hardCount > 0 && (
-                      <span className="inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-semibold leading-none text-white">
-                        {hardCount > 99 ? '99+' : hardCount}
-                      </span>
+                      <Tooltip title={`${hardCount} bentrok keras (hard conflict) — wajib diperbaiki`}>
+                        <span className="inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-semibold leading-none text-white">
+                          {hardCount > 99 ? '99+' : hardCount}
+                        </span>
+                      </Tooltip>
                     )}
                     {softCount > 0 && (
-                      <span className="inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] font-semibold leading-none text-white">
-                        {softCount > 99 ? '99+' : softCount}
-                      </span>
+                      <Tooltip title={`${softCount} bentrok lunak (soft conflict) — sebaiknya dicek, tidak wajib`}>
+                        <span className="inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] font-semibold leading-none text-white">
+                          {softCount > 99 ? '99+' : softCount}
+                        </span>
+                      </Tooltip>
                     )}
                   </span>
                 )}
@@ -400,16 +404,9 @@ export default function App() {
                 ] as MenuProps['items'],
                 onClick: ({ key }) => {
                   if (key === 'csv') exportCsv(entries);
-                  else if (key === 'excel') {
-                    const hide = message.loading('Menyiapkan file Excel...', 0);
-                    exportExcel(entries)
-                      .then(() => message.success('Excel berhasil diexport'))
-                      .catch(() => message.error('Gagal export Excel, coba lagi.'))
-                      .finally(hide);
-                  } else if (key === 'cetak') {
-                    setExportOpen(false);
-                    requestAnimationFrame(() => window.print());
-                  }
+                  else if (key === 'excel')
+                    exportExcel(entries).catch(() => message.error('Gagal membuat file Excel.'));
+                  else if (key === 'cetak') window.print();
                 },
               }}
               open={exportOpen}
@@ -451,17 +448,6 @@ export default function App() {
               {focusLabel}
             </Tag>
           )}
-        </div>
-
-        <div className="hidden print:block">
-          <div className="bg-blue-900 px-3 py-2 text-center text-base font-bold text-white">
-            JADWAL PELAJARAN
-          </div>
-          <div className="bg-slate-100 px-3 py-1 text-center text-[10px] italic text-slate-600">
-            Digenerate{' '}
-            {new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' })} ·{' '}
-            {DATASET.classes.length} kelas
-          </div>
         </div>
 
         <div ref={gridWrapRef}>
